@@ -57,9 +57,8 @@ static QColor getFileTypeColor(const QString &filePath) {
         return QColor("LightBlue");
 }
 
-// Returns a color for a folder based on its depth (interpolates between LightGreen and DarkOliveGreen).
+// Returns a color for a folder based on its depth (interpolating between LightGreen and DarkOliveGreen).
 static QColor getFolderDepthColor(int depth) {
-    // LightGreen (144,238,144) and DarkOliveGreen (85,107,47)
     double maxDepth = 10.0;
     double factor = std::min(depth / maxDepth, 1.0);
     int r = static_cast<int>(144 * (1 - factor) + 85 * factor);
@@ -85,7 +84,6 @@ static void divideDisplayArea(QList<RenderItem> &items, int start, int count, co
         return;
     }
 
-    // Group items until adding the next would push the sum beyond half of totalSize.
     int groupACount = 0;
     double sizeA = 0;
     int i = start;
@@ -146,7 +144,6 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
         return node;
     }
 
-    // Process files (only include those >= 100 bytes)
     QFileInfoList fileInfos = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const QFileInfo &fi : fileInfos) {
         if (fi.size() >= 100) {
@@ -155,7 +152,6 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
         }
     }
 
-    // Process subfolders recursively
     QFileInfoList dirInfos = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const QFileInfo &di : dirInfos) {
         auto child = buildFolderTreeRecursive(di.absoluteFilePath());
@@ -173,7 +169,7 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
 void FolderMapWidget::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
-    m_renderItems.clear(); // Clear previous render items.
+    m_renderItems.clear();
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     if (rootFolder)
@@ -183,11 +179,9 @@ void FolderMapWidget::paintEvent(QPaintEvent *event)
 void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<FolderNode> &node, const QRectF &rect, int depth)
 {
     QList<RenderItem> items;
-    // Add subfolders.
     for (const auto &sub : node->subFolders) {
         items.append({sub->path, sub->totalSize, true, sub, QRectF()});
     }
-    // Add files.
     for (const auto &file : node->files) {
         items.append({file.first, file.second, false, nullptr, QRectF()});
     }
@@ -197,7 +191,6 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
     }
     qDebug() << "Rendering node:" << node->path << "with" << items.size() << "items.";
 
-    // Sort items by descending size.
     std::sort(items.begin(), items.end(), [](const RenderItem &a, const RenderItem &b) {
         return a.size > b.size;
     });
@@ -207,7 +200,6 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         total += item.size;
 
     double gap = 1.0;
-    // Subdivide the area among items.
     divideDisplayArea(items, 0, items.size(), rect, total, gap);
 
     // --- Rollup small items ---
@@ -246,19 +238,13 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         divideDisplayArea(items, 0, items.size(), rect, total, gap);
     }
 
-    // Save the rendered items for mouseover lookup.
     for (const auto &item : items)
         m_renderItems.append(item);
 
-    // Save original font.
     QFont originalFont = painter.font();
-    // Define explicit fonts:
-    QFont fileFont = originalFont;
-    fileFont.setPointSize(7);
-    QFont folderFont = originalFont;
-    folderFont.setPointSize(9);
+    QFont fileFont = originalFont; fileFont.setPointSize(7);
+    QFont folderFont = originalFont; folderFont.setPointSize(9);
 
-    // Draw each item.
     for (const auto &item : items) {
         QColor fillColor;
         if (item.isRollup)
@@ -287,9 +273,11 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
                              fmFolder.height());
             painter.drawText(labelRect, Qt::AlignCenter, elidedText);
             // Define the area for child items inside the folder.
-            QRectF childRect(item.rect.left() + 2,
+            // Here we add an extra 2-pixel buffer on each side.
+            int extraSideBuffer = 2;
+            QRectF childRect(item.rect.left() + 2 + extraSideBuffer,
                              item.rect.top() + 9 + fmFolder.height(),
-                             item.rect.width() - 4,
+                             item.rect.width() - 4 - 2 * extraSideBuffer,
                              item.rect.height() - 9 - fmFolder.height() - 2);
             if (childRect.width() > 50 && childRect.height() > 30) {
                 renderFolderMap(painter, item.folder, childRect, depth + 1);
@@ -320,7 +308,6 @@ void FolderMapWidget::zoomOut()
 
 void FolderMapWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    // Iterate over rendered items in reverse order to prioritize more specific ones.
     for (int i = m_renderItems.size() - 1; i >= 0; i--) {
         const RenderItem &item = m_renderItems.at(i);
         if (item.rect.contains(event->pos())) {
@@ -335,4 +322,19 @@ void FolderMapWidget::mouseMoveEvent(QMouseEvent *event)
     }
     QToolTip::hideText();
     event->ignore();
+}
+
+void FolderMapWidget::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    for (int i = m_renderItems.size() - 1; i >= 0; i--) {
+        const RenderItem &item = m_renderItems.at(i);
+        if (item.rect.contains(event->pos())) {
+            if (item.isFolder && !item.isRollup && item.folder) {
+                rootFolder = item.folder;
+                update();
+                return;
+            }
+        }
+    }
+    QWidget::mouseDoubleClickEvent(event);
 }

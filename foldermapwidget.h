@@ -39,6 +39,7 @@ public:
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
     std::shared_ptr<FolderNode> buildFolderTreeRecursive(const QString &path);
