@@ -2,6 +2,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPaintEvent>
 #include <QFileInfoList>
 #include <QToolTip>
@@ -11,10 +12,23 @@
 #include <algorithm>
 #include <QRectF>
 #include <cmath>
-#include <QPainterPath>
+
+// Adjustable Parameters
+static const int CORNER_ROUNDNESS = 4;              // Corner roundness in pixels.
+static const double GAP_BETWEEN_ITEMS = 2.0;        // Gap between adjacent items (files/folders).
+static const int EXTRA_SIDE_BUFFER = 2;             // Additional side buffer for folder child area.
+static const int TOP_MARGIN_FOLDER_LABEL = 6;       // Top margin for folder label.
+static const int SIDE_MARGIN_FOLDER_LABEL = 2;      // Left/right margin for folder label.
+static const int BOTTOM_MARGIN_FOLDER_LABEL = 2;    // Bottom margin for folder label.
+static const int FILE_FONT_SIZE = 5;                // Fixed font size for files.
+static const int FOLDER_FONT_SIZE = 7;              // Fixed font size for folders.
+static const double ROLLUP_THRESHOLD = 3.0;         // Threshold (in pixels) below which items are rolled up.
+
+// Color settings (you can adjust these as needed)
+static const QColor COLOR_ROLLUP = Qt::darkGray;
 
 // ---------------------------------------------------------------------------
-// Color helpers
+// Color helper functions
 // ---------------------------------------------------------------------------
 static QColor getFileTypeColor(const QString &filePath) {
     QString ext = QFileInfo(filePath).suffix().toLower();
@@ -188,15 +202,14 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
     qint64 total = 0;
     for (const auto &item : items)
         total += item.size;
-    double gap = 1.0;
+    double gap = GAP_BETWEEN_ITEMS;
     divideDisplayArea(items, 0, items.size(), rect, total, gap);
 
     // --- Rollup small items ---
-    double rollupThreshold = 3.0;
     QList<RenderItem> tinyItems;
     for (int i = items.size() - 1; i >= 0; i--) {
         const RenderItem &it = items.at(i);
-        if (it.rect.width() < rollupThreshold || it.rect.height() < rollupThreshold) {
+        if (it.rect.width() < ROLLUP_THRESHOLD || it.rect.height() < ROLLUP_THRESHOLD) {
             tinyItems.append(it);
             items.removeAt(i);
         }
@@ -229,22 +242,21 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         m_renderItems.append(item);
 
     QFont originalFont = painter.font();
-    QFont fileFont = originalFont; fileFont.setPointSize(7);
-    QFont folderFont = originalFont; folderFont.setPointSize(9);
+    QFont fileFont = originalFont; fileFont.setPointSize(FILE_FONT_SIZE);
+    QFont folderFont = originalFont; folderFont.setPointSize(FOLDER_FONT_SIZE);
 
     // Draw each item with rounded corners and a 1-pixel gap.
     for (const auto &item : items) {
         QColor fillColor;
         if (item.isRollup)
-            fillColor = Qt::darkGray;
+            fillColor = COLOR_ROLLUP;
         else if (item.isFolder)
             fillColor = getFolderDepthColor(depth);
         else
             fillColor = getFileTypeColor(item.path);
-        // Adjust the rectangle to create a 1-pixel separator.
         QRectF innerRect = item.rect.adjusted(0.5, 0.5, -0.5, -0.5);
         QPainterPath path;
-        path.addRoundedRect(innerRect, 3, 3);
+        path.addRoundedRect(innerRect, CORNER_ROUNDNESS, CORNER_ROUNDNESS);
         painter.fillPath(path, fillColor);
         painter.drawPath(path);
 
@@ -257,19 +269,16 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
             painter.setFont(folderFont);
             QFontMetrics fmFolder(painter.font());
             QString filename = QFileInfo(item.path).fileName();
-            QString elidedText = fmFolder.elidedText(filename, Qt::ElideRight, static_cast<int>(item.rect.width() - 4));
-            // Folder label area: top margin 9 pixels, 2-pixel side & bottom margins.
-            QRectF labelRect(item.rect.left() + 2,
-                             item.rect.top() + 9,
-                             item.rect.width() - 4,
+            QString elidedText = fmFolder.elidedText(filename, Qt::ElideRight, static_cast<int>(item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL));
+            QRectF labelRect(item.rect.left() + SIDE_MARGIN_FOLDER_LABEL,
+                             item.rect.top() + TOP_MARGIN_FOLDER_LABEL,
+                             item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL,
                              fmFolder.height());
             painter.drawText(labelRect, Qt::AlignCenter, elidedText);
-            // Child area: add an extra 2-pixel buffer on each side.
-            int extraSideBuffer = 2;
-            QRectF childRect(item.rect.left() + 2 + extraSideBuffer,
-                             item.rect.top() + 9 + fmFolder.height(),
-                             item.rect.width() - 4 - 2 * extraSideBuffer,
-                             item.rect.height() - 9 - fmFolder.height() - 2);
+            QRectF childRect(item.rect.left() + SIDE_MARGIN_FOLDER_LABEL + EXTRA_SIDE_BUFFER,
+                             item.rect.top() + TOP_MARGIN_FOLDER_LABEL + fmFolder.height(),
+                             item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL - 2 * EXTRA_SIDE_BUFFER,
+                             item.rect.height() - TOP_MARGIN_FOLDER_LABEL - fmFolder.height() - BOTTOM_MARGIN_FOLDER_LABEL);
             if (childRect.width() > 50 && childRect.height() > 30) {
                 renderFolderMap(painter, item.folder, childRect, depth + 1);
             }
