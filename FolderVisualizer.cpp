@@ -1,24 +1,22 @@
 #include "FolderVisualizer.h"
-#include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
 #include <QVBoxLayout>
 #include <QFileInfo>
-#include <QMouseEvent>
-#include <QGraphicsSceneMouseEvent>
 #include <QDebug>
-#include <QFont>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QProcess>
+#include <QMessageBox>
 
-// Constructor: Initializes UI components
 FolderVisualizer::FolderVisualizer(const QString& path, QWidget *parent)
     : QMainWindow(parent), currentPath(path) {
 
     this->setWindowTitle("Linux Folder Visualizer");
     this->resize(800, 600);
 
-    // Layout for navigation bar
     QWidget *navBarWidget = new QWidget(this);
     navBarLayout = new QHBoxLayout(navBarWidget);
-    
+
     backButton = new QPushButton("⬅ Up", this);
     pathLabel = new QLabel(this);
     pathLabel->setText(currentPath);
@@ -26,12 +24,12 @@ FolderVisualizer::FolderVisualizer(const QString& path, QWidget *parent)
     connect(backButton, &QPushButton::clicked, this, &FolderVisualizer::navigateUp);
     navBarLayout->addWidget(backButton);
     navBarLayout->addWidget(pathLabel);
-    
+
     view = new QGraphicsView(this);
     scene = new QGraphicsScene(this);
     view->setScene(scene);
     view->setRenderHint(QPainter::Antialiasing);
-    view->setDragMode(QGraphicsView::ScrollHandDrag); // Enable panning
+    view->setDragMode(QGraphicsView::ScrollHandDrag);
 
     QVBoxLayout *mainLayout = new QVBoxLayout();
     mainLayout->addWidget(navBarWidget);
@@ -44,37 +42,57 @@ FolderVisualizer::FolderVisualizer(const QString& path, QWidget *parent)
     updateVisualization(path);
 }
 
-// Updates the visualization when navigating to a different folder
 void FolderVisualizer::updateVisualization(const QString& path) {
-    scene->clear();
+    qDebug() << "Updating visualization for:" << path;
+
+    // Step 1: Clear existing scene items properly
+    QList<QGraphicsItem *> allItems = scene->items();
+    for (QGraphicsItem *item : allItems) {
+        delete item; // Free memory
+    }
+    scene->clear(); // Ensure everything is cleared
+
+    // Step 2: Update the path
     currentPath = path;
     pathLabel->setText(path);
-    
+
+    // Step 3: Scan the new folder and visualize it
     QList<FileItem> fileData = scanFolder(path);
     divideSpace(fileData, QRectF(10, 10, 780, 580));
 }
 
-// Scans a folder and retrieves file/folder sizes
+
 QList<FolderVisualizer::FileItem> FolderVisualizer::scanFolder(const QString& path) {
     QList<FileItem> fileData;
     QDir dir(path);
 
+    // Get all files in the current folder
     QFileInfoList files = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     foreach (const QFileInfo &file, files) {
-        fileData.append({file.filePath(), file.size()});
+        qDebug() << "File detected:" << file.filePath() << "Size:" << file.size();
+        fileData.append({file.filePath(), file.size(), false});
     }
 
+    // Get all subfolders and scan them recursively
     QFileInfoList folders = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     foreach (const QFileInfo &folder, folders) {
         qint64 folderSize = 0;
-        QDir subDir(folder.filePath());
-        foreach (const QFileInfo &subFile, subDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Size)) {
-            folderSize += subFile.size();
+        QList<FileItem> subFolderItems = scanFolder(folder.filePath()); // Recursive call
+
+        foreach (const FileItem &subFile, subFolderItems) {
+            folderSize += subFile.size;
+            fileData.append(subFile);
         }
-        fileData.append({folder.filePath(), folderSize});
+
+        qDebug() << "Folder detected:" << folder.filePath() << "Size:" << folderSize;
+        fileData.append({folder.filePath(), folderSize, true});
     }
 
-    // Sort by size (largest first)
+    if (fileData.isEmpty()) {
+        qDebug() << "No files or folders found in" << path;
+    }
+
+    // Sort largest first
     std::sort(fileData.begin(), fileData.end(), [](const FileItem &a, const FileItem &b) {
         return a.size > b.size;
     });
@@ -82,88 +100,87 @@ QList<FolderVisualizer::FileItem> FolderVisualizer::scanFolder(const QString& pa
     return fileData;
 }
 
-// Recursive function to divide space proportionally
 void FolderVisualizer::divideSpace(const QList<FileItem>& items, QRectF area) {
-    if (items.isEmpty() || area.width() <= 0 || area.height() <= 0)
-        return;
-
-    if (items.size() == 1) {
-        FileItem item = items.first();
-        
-        QColor fillColor = getFileTypeColor(item.path);
-        QGraphicsRectItem *rect = scene->addRect(area, QPen(Qt::black), QBrush(fillColor));
-        rect->setToolTip(QString("File: %1\nSize: %2 KB").arg(item.path.section("/", -1)).arg(item.size / 1024));
-        rect->setData(0, item.path); // Store path in data
-
-        QGraphicsTextItem *text = scene->addText(item.path.section("/", -1));
-        text->setFont(QFont("Arial", 8));
-        text->setPos(area.x() + 5, area.y() + 5);
-        text->setZValue(1);
-
-        rect->setFlag(QGraphicsItem::ItemIsSelectable);
-        connect(scene, &QGraphicsScene::selectionChanged, this, [=]() {
-            if (rect->isSelected()) {
-                onItemClicked(rect);
-            }
-        });
-
+    if (items.isEmpty() || area.width() <= 0 || area.height() <= 0) {
+        qDebug() << "divideSpace() skipped: empty items or zero area!";
         return;
     }
 
+    qDebug() << "Dividing area:" << area << "for" << items.size() << "items";
+
+    // Calculate total size of all items
     qint64 totalSize = 0;
     for (const auto &item : items) totalSize += item.size;
 
-    qint64 halfSize = totalSize / 2;
-    qint64 accumulatedSize = 0;
-    int splitIndex = 0;
+    bool horizontalSplit = area.width() >= area.height(); // Decide split direction
 
-    while (accumulatedSize < halfSize && splitIndex < items.size()) {
-        accumulatedSize += items[splitIndex].size;
-        splitIndex++;
-    }
+    qreal x = area.x();
+    qreal y = area.y();
+    qreal width = area.width();
+    qreal height = area.height();
 
-    bool horizontalSplit = area.width() >= area.height();
-    if (horizontalSplit) {
-        qreal midX = area.x() + (area.width() * accumulatedSize / totalSize);
-        divideSpace(items.mid(0, splitIndex), QRectF(area.x(), area.y(), midX - area.x(), area.height()));
-        divideSpace(items.mid(splitIndex), QRectF(midX, area.y(), area.right() - midX, area.height()));
-    } else {
-        qreal midY = area.y() + (area.height() * accumulatedSize / totalSize);
-        divideSpace(items.mid(0, splitIndex), QRectF(area.x(), area.y(), area.width(), midY - area.y()));
-        divideSpace(items.mid(splitIndex), QRectF(area.x(), midY, area.width(), area.bottom() - midY));
+    for (int i = 0; i < items.size(); i++) {
+        const FileItem &item = items[i];
+
+        if (item.size == 0) continue; // Ignore zero-size items
+
+        // Determine proportional size
+        qreal proportion = static_cast<qreal>(item.size) / totalSize;
+        QRectF itemRect;
+
+        if (horizontalSplit) {
+            qreal itemWidth = width * proportion;
+            itemRect = QRectF(x, y, itemWidth, height);
+            x += itemWidth;
+        } else {
+            qreal itemHeight = height * proportion;
+            itemRect = QRectF(x, y, width, itemHeight);
+            y += itemHeight;
+        }
+
+        // Ensure the rectangle has a minimum visible size
+        if (itemRect.width() < 5 || itemRect.height() < 5)
+            continue;
+
+        qDebug() << "Rendering item:" << item.path << "Size:" << item.size << "Rect:" << itemRect;
+
+        // Create visual representation
+        CustomGraphicsItem *rect = new CustomGraphicsItem(item.path, item.isFolder, itemRect);
+        scene->addItem(rect);
+        connect(rect, &CustomGraphicsItem::itemDoubleClicked, this, &FolderVisualizer::handleItemDoubleClicked);
+
+        // Recursively divide remaining space among smaller items
+        if (i == items.size() - 1) break; // Stop if last item
+
+        QList<FileItem> remainingItems = items.mid(i + 1);
+        QRectF remainingArea;
+
+        if (horizontalSplit) {
+            remainingArea = QRectF(x, y, width - x, height);
+        } else {
+            remainingArea = QRectF(x, y, width, height - y);
+        }
+
+        if (!remainingItems.isEmpty() && remainingArea.width() > 0 && remainingArea.height() > 0) {
+            divideSpace(remainingItems, remainingArea);
+        }
+        break;
     }
 }
 
-// Handles clicking on a file/folder
-void FolderVisualizer::onItemClicked(QGraphicsItem *item) {
-    QString path = item->data(0).toString();
-    if (QFileInfo(path).isDir()) {
+void FolderVisualizer::handleItemDoubleClicked(const QString& path, bool isFolder) {
+    if (isFolder) {
+        qDebug() << "Navigating into folder:" << path;
         updateVisualization(path);
+    } else {
+        qDebug() << "Ignoring double-click on file:" << path;
     }
 }
 
-// Navigate up one directory
+
 void FolderVisualizer::navigateUp() {
     QDir dir(currentPath);
     if (dir.cdUp()) {
         updateVisualization(dir.absolutePath());
     }
-}
-
-// Enable zooming with the mouse wheel
-void FolderVisualizer::wheelEvent(QWheelEvent *event) {
-    if (event->angleDelta().y() > 0)
-        view->scale(1.2, 1.2);
-    else
-        view->scale(0.8, 0.8);
-}
-
-// Assign colors based on file type
-QColor FolderVisualizer::getFileTypeColor(const QString& filePath) {
-    QString ext = QFileInfo(filePath).suffix().toLower();
-    if (ext == "jpg" || ext == "png" || ext == "gif") return QColor(Qt::yellow);
-    if (ext == "mp4" || ext == "avi" || ext == "mkv") return QColor(Qt::red);
-    if (ext == "mp3" || ext == "wav") return QColor(Qt::green);
-    if (ext == "pdf" || ext == "docx" || ext == "xlsx") return QColor(Qt::cyan);
-    return QColor(Qt::gray);
 }

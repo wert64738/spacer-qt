@@ -52,11 +52,15 @@ OBJECTS_DIR   = ./
 
 ####### Files
 
-SOURCES       = main.cpp \
-		FolderVisualizer.cpp moc_FolderVisualizer.cpp
-OBJECTS       = main.o \
-		FolderVisualizer.o \
-		moc_FolderVisualizer.o
+SOURCES       = FolderVisualizer.cpp \
+		main.cpp \
+		CustomGraphicsItem.cpp moc_FolderVisualizer.cpp \
+		moc_CustomGraphicsItem.cpp
+OBJECTS       = FolderVisualizer.o \
+		main.o \
+		CustomGraphicsItem.o \
+		moc_FolderVisualizer.o \
+		moc_CustomGraphicsItem.o
 DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/unix.conf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/linux.conf \
@@ -134,8 +138,10 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/exceptions.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/yacc.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/lex.prf \
-		FolderVisualizer.pro FolderVisualizer.h main.cpp \
-		FolderVisualizer.cpp
+		FolderVisualizer.pro FolderVisualizer.h \
+		CustomGraphicsItem.h FolderVisualizer.cpp \
+		main.cpp \
+		CustomGraphicsItem.cpp
 QMAKE_TARGET  = FolderVisualizer
 DESTDIR       = 
 TARGET        = FolderVisualizer
@@ -319,8 +325,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents FolderVisualizer.h $(DISTDIR)/
-	$(COPY_FILE) --parents main.cpp FolderVisualizer.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents FolderVisualizer.h CustomGraphicsItem.h $(DISTDIR)/
+	$(COPY_FILE) --parents FolderVisualizer.cpp main.cpp CustomGraphicsItem.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -352,13 +358,19 @@ compiler_moc_predefs_clean:
 moc_predefs.h: /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp
 	g++ -pipe -O2 -Wall -Wextra -dM -E -o moc_predefs.h /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp
 
-compiler_moc_header_make_all: moc_FolderVisualizer.cpp
+compiler_moc_header_make_all: moc_FolderVisualizer.cpp moc_CustomGraphicsItem.cpp
 compiler_moc_header_clean:
-	-$(DEL_FILE) moc_FolderVisualizer.cpp
+	-$(DEL_FILE) moc_FolderVisualizer.cpp moc_CustomGraphicsItem.cpp
 moc_FolderVisualizer.cpp: FolderVisualizer.h \
+		CustomGraphicsItem.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
 	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/david/Documents/code/spacer2/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/david/Documents/code/spacer2 -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 -I/usr/include/c++/13/backward -I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include FolderVisualizer.h -o moc_FolderVisualizer.cpp
+
+moc_CustomGraphicsItem.cpp: CustomGraphicsItem.h \
+		moc_predefs.h \
+		/usr/lib/qt5/bin/moc
+	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/david/Documents/code/spacer2/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/david/Documents/code/spacer2 -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 -I/usr/include/c++/13/backward -I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include CustomGraphicsItem.h -o moc_CustomGraphicsItem.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -376,14 +388,22 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 
 ####### Compile
 
-main.o: main.cpp FolderVisualizer.h
+FolderVisualizer.o: FolderVisualizer.cpp FolderVisualizer.h \
+		CustomGraphicsItem.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o FolderVisualizer.o FolderVisualizer.cpp
+
+main.o: main.cpp FolderVisualizer.h \
+		CustomGraphicsItem.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cpp
 
-FolderVisualizer.o: FolderVisualizer.cpp FolderVisualizer.h
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o FolderVisualizer.o FolderVisualizer.cpp
+CustomGraphicsItem.o: CustomGraphicsItem.cpp CustomGraphicsItem.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o CustomGraphicsItem.o CustomGraphicsItem.cpp
 
 moc_FolderVisualizer.o: moc_FolderVisualizer.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_FolderVisualizer.o moc_FolderVisualizer.cpp
+
+moc_CustomGraphicsItem.o: moc_CustomGraphicsItem.cpp 
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_CustomGraphicsItem.o moc_CustomGraphicsItem.cpp
 
 ####### Install
 

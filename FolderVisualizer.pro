@@ -1,3 +1,4 @@
 QT += widgets
-SOURCES += main.cpp FolderVisualizer.cpp
-HEADERS += FolderVisualizer.h
+SOURCES += FolderVisualizer.cpp main.cpp CustomGraphicsItem.cpp
+HEADERS += FolderVisualizer.h CustomGraphicsItem.h
+

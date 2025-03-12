@@ -23,7 +23,7 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 struct qt_meta_stringdata_FolderVisualizer_t {
     QByteArrayData data[6];
-    char stringdata0[63];
+    char stringdata0[67];
 };
 #define QT_MOC_LITERAL(idx, ofs, len) \
     Q_STATIC_BYTE_ARRAY_DATA_HEADER_INITIALIZER_WITH_OFFSET(len, \
@@ -33,15 +33,15 @@ struct qt_meta_stringdata_FolderVisualizer_t {
 static const qt_meta_stringdata_FolderVisualizer_t qt_meta_stringdata_FolderVisualizer = {
     {
 QT_MOC_LITERAL(0, 0, 16), // "FolderVisualizer"
-QT_MOC_LITERAL(1, 17, 13), // "onItemClicked"
-QT_MOC_LITERAL(2, 31, 0), // ""
-QT_MOC_LITERAL(3, 32, 14), // "QGraphicsItem*"
-QT_MOC_LITERAL(4, 47, 4), // "item"
-QT_MOC_LITERAL(5, 52, 10) // "navigateUp"
+QT_MOC_LITERAL(1, 17, 23), // "handleItemDoubleClicked"
+QT_MOC_LITERAL(2, 41, 0), // ""
+QT_MOC_LITERAL(3, 42, 4), // "path"
+QT_MOC_LITERAL(4, 47, 8), // "isFolder"
+QT_MOC_LITERAL(5, 56, 10) // "navigateUp"
 
     },
-    "FolderVisualizer\0onItemClicked\0\0"
-    "QGraphicsItem*\0item\0navigateUp"
+    "FolderVisualizer\0handleItemDoubleClicked\0"
+    "\0path\0isFolder\0navigateUp"
 };
 #undef QT_MOC_LITERAL
 
@@ -59,11 +59,11 @@ static const uint qt_meta_data_FolderVisualizer[] = {
        0,       // signalCount
 
  // slots: name, argc, parameters, tag, flags
-       1,    1,   24,    2, 0x08 /* Private */,
-       5,    0,   27,    2, 0x08 /* Private */,
+       1,    2,   24,    2, 0x08 /* Private */,
+       5,    0,   29,    2, 0x08 /* Private */,
 
  // slots: parameters
-    QMetaType::Void, 0x80000000 | 3,    4,
+    QMetaType::Void, QMetaType::QString, QMetaType::Bool,    3,    4,
     QMetaType::Void,
 
        0        // eod
@@ -75,7 +75,7 @@ void FolderVisualizer::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int
         auto *_t = static_cast<FolderVisualizer *>(_o);
         (void)_t;
         switch (_id) {
-        case 0: _t->onItemClicked((*reinterpret_cast< QGraphicsItem*(*)>(_a[1]))); break;
+        case 0: _t->handleItemDoubleClicked((*reinterpret_cast< const QString(*)>(_a[1])),(*reinterpret_cast< bool(*)>(_a[2]))); break;
         case 1: _t->navigateUp(); break;
         default: ;
         }
