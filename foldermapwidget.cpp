@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <QRectF>
 #include <cmath>
+#include <QSet>
+#include "foldermapwidget.h"
 
 // ---------------------------------------------------------------------------
 // Treemap subdivision algorithm (emulating DivideDisplayArea)
@@ -80,8 +82,24 @@ void FolderMapWidget::buildFolderTree(const QString &path)
     update();
 }
 
-std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)
+
+
+// Helper: Recursively build the folder tree while avoiding loops.
+static std::shared_ptr<FolderNode> buildFolderTreeRecursiveHelper(const QString &path, QSet<QString> &visited)
 {
+    QFileInfo info(path);
+    // Get the canonical path; if empty, fallback to absolute path.
+    QString canonicalPath = info.canonicalFilePath();
+    if (canonicalPath.isEmpty())
+        canonicalPath = info.absoluteFilePath();
+    
+    // If we've already visited this directory, skip it.
+    if (visited.contains(canonicalPath)) {
+        qDebug() << "Loop detected, skipping:" << path;
+        return std::make_shared<FolderNode>(); // Return an empty node.
+    }
+    visited.insert(canonicalPath);
+    
     auto node = std::make_shared<FolderNode>();
     node->path = path;
     QDir dir(path);
@@ -89,7 +107,7 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
         qDebug() << "Directory does not exist:" << path;
         return node;
     }
-
+    
     // Process files (only include those >= 100 bytes)
     QFileInfoList fileInfos = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const QFileInfo &fi : fileInfos) {
@@ -98,11 +116,11 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
             node->totalSize += fi.size();
         }
     }
-
-    // Process subfolders recursively
+    
+    // Process subfolders recursively.
     QFileInfoList dirInfos = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const QFileInfo &di : dirInfos) {
-        auto child = buildFolderTreeRecursive(di.absoluteFilePath());
+        auto child = buildFolderTreeRecursiveHelper(di.absoluteFilePath(), visited);
         if (child && child->totalSize > 0) {
             node->subFolders.append(child);
             node->totalSize += child->totalSize;
@@ -113,6 +131,14 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
              << ", total size =" << node->totalSize;
     return node;
 }
+
+// Original function now calls the helper with an empty visited set.
+std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)
+{
+    QSet<QString> visited;
+    return buildFolderTreeRecursiveHelper(path, visited);
+}
+
 
 void FolderMapWidget::paintEvent(QPaintEvent *event)
 {
@@ -154,6 +180,43 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
     // Subdivide the area among items.
     divideDisplayArea(items, 0, items.size(), rect, total, gap);
 
+    // --- Rollup small items ---
+    // Define a threshold below which an item is considered too small.
+    double rollupThreshold = 3.0;
+    QList<RenderItem> tinyItems;
+    for (int i = items.size() - 1; i >= 0; i--) {
+        const RenderItem &it = items.at(i);
+        if (it.rect.width() < rollupThreshold || it.rect.height() < rollupThreshold) {
+            tinyItems.append(it);
+            items.removeAt(i);
+        }
+    }
+    if (!tinyItems.isEmpty()) {
+        int rollupCount = tinyItems.size();
+        qint64 rollupSize = 0;
+        qint64 rollupMaxSize = 0;
+        for (const RenderItem &it : tinyItems) {
+            rollupSize += it.size;
+            if (it.size > rollupMaxSize)
+                rollupMaxSize = it.size;
+        }
+        RenderItem rollupItem;
+        rollupItem.path = QString("Rollup (%1)").arg(rollupCount);
+        rollupItem.size = rollupSize;
+        rollupItem.isFolder = false;
+        rollupItem.isRollup = true;
+        rollupItem.rollupCount = rollupCount;
+        rollupItem.rollupMaxSize = rollupMaxSize;
+        items.append(rollupItem);
+        std::sort(items.begin(), items.end(), [](const RenderItem &a, const RenderItem &b) {
+            return a.size > b.size;
+        });
+        total = 0;
+        for (const RenderItem &it : items)
+            total += it.size;
+        // Recalculate subdivisions with the new rollup item in place.
+        divideDisplayArea(items, 0, items.size(), rect, total, gap);
+    }
     // Save the rendered items for mouseover lookup.
     for (const auto &item : items)
         m_renderItems.append(item);
@@ -170,11 +233,18 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
 
     // Draw each item.
     for (const auto &item : items) {
-        QColor fillColor = item.isFolder ? ((depth % 2 == 0) ? Qt::lightGray : Qt::gray) : Qt::cyan;
+        QColor fillColor = item.isFolder ? ((depth % 2 == 0) ? Qt::lightGray : Qt::gray)
+                                         : (item.isRollup ? Qt::darkGray : Qt::cyan);
         painter.fillRect(item.rect, fillColor);
         painter.drawRect(item.rect);
 
-        if (item.isFolder) {
+        if (item.isRollup) {
+            // Draw the rollup label in the center.
+            painter.setFont(folderFont);
+            QFontMetrics fmRollup(painter.font());
+            QString rollupText = item.path; // e.g. "Rollup (3)"
+            painter.drawText(item.rect, Qt::AlignCenter, rollupText);
+        } else if (item.isFolder) {
             // Draw the folder label using folderFont.
             painter.setFont(folderFont);
             QFontMetrics fmFolder(painter.font());
@@ -227,9 +297,12 @@ void FolderMapWidget::mouseMoveEvent(QMouseEvent *event)
     for (int i = m_renderItems.size() - 1; i >= 0; i--) {
         const RenderItem &item = m_renderItems.at(i);
         if (item.rect.contains(event->pos())) {
-            // Show the full file or folder name.
-            QString fullName = QFileInfo(item.path).fileName();
-            QToolTip::showText(event->globalPos(), fullName, this);
+            QString tooltipText;
+            if (item.isRollup)
+                tooltipText = QString("Rolled up %1 items").arg(item.rollupCount);
+            else
+                tooltipText = QFileInfo(item.path).fileName();
+            QToolTip::showText(event->globalPos(), tooltipText, this);
             return;
         }
     }

@@ -22,6 +22,10 @@ struct RenderItem {
     bool isFolder;
     std::shared_ptr<FolderNode> folder; // Valid if isFolder is true.
     QRectF rect;                      // Assigned by the treemap subdivision algorithm.
+    // Rollup fields:
+    bool isRollup = false;
+    int rollupCount = 0;
+    qint64 rollupMaxSize = 0;
 };
 
 class FolderMapWidget : public QWidget
