@@ -308,6 +308,9 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
     folderFont.setPointSize(FOLDER_FONT_SIZE);
     folderFont.setBold(true);  // Folder names in bold
 
+    // Constants for minimum label size.
+    const qreal MIN_LABEL_WIDTH = 50.0;
+
     // Draw each item with rounded corners and a 1-pixel gap.
     for (const auto &item : items) {
         QColor fillColor;
@@ -320,67 +323,77 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         QRectF innerRect = item.rect.adjusted(0.5, 0.5, -0.5, -0.5);
         QPainterPath path;
         path.addRoundedRect(innerRect, CORNER_ROUNDNESS, CORNER_ROUNDNESS);
+        painter.setPen(QColor(100, 100, 100));
         painter.fillPath(path, fillColor);
         painter.drawPath(path);
-
+        painter.setPen(Qt::black);
         if (item.isRollup) {
             painter.setFont(folderFont);
             QFontMetrics fmRollup(painter.font());
             QString rollupText = item.path;
             painter.drawText(innerRect, Qt::AlignCenter, rollupText);
         } else if (item.isFolder) {
-            // For folders: show the name with its size (in brackets) on the same line.
+            // For folders: display the name with its size (in brackets) on the same line.
             painter.setFont(folderFont);
             QFontMetrics fmFolder(painter.font());
-            QString folderName = QFileInfo(item.path).fileName();
-            QString sizeStr = QString(" (%1)").arg(formatFileSize(item.size));
+            // Check if there is enough space to print the text.
+            bool canDrawText = (item.rect.width() >= MIN_LABEL_WIDTH &&
+                                item.rect.height() >= (TOP_MARGIN_FOLDER_LABEL + fmFolder.height()));
+            if (canDrawText) {
+                QString folderName = QFileInfo(item.path).fileName();
+                QString sizeStr = QString(" (%1)").arg(formatFileSize(item.size));
 
-            // Create a smaller, non-bold font for the size text.
-            QFont folderSizeFont = folderFont;
-            folderSizeFont.setBold(false);
-            folderSizeFont.setPointSize(folderFont.pointSize() - 1);
-            QFontMetrics fmFolderSize(folderSizeFont);
+                // Use a smaller, non-bold font for the size text.
+                QFont folderSizeFont = folderFont;
+                folderSizeFont.setBold(false);
+                folderSizeFont.setPointSize(folderFont.pointSize() - 1);
+                QFontMetrics fmFolderSize(folderSizeFont);
 
-            int availableWidth = static_cast<int>(item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL);
-            int sizeTextWidth = fmFolderSize.horizontalAdvance(sizeStr);
-            // Elide the folder name if needed.
-            QString elidedFolderName = fmFolder.elidedText(folderName, Qt::ElideRight, availableWidth - sizeTextWidth);
-            int folderNameWidth = fmFolder.horizontalAdvance(elidedFolderName);
-            int totalTextWidth = folderNameWidth + sizeTextWidth;
-            double startX = item.rect.left() + SIDE_MARGIN_FOLDER_LABEL +
-                            (item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL - totalTextWidth) / 2.0;
-            int baseline = item.rect.top() + TOP_MARGIN_FOLDER_LABEL + fmFolder.ascent();
+                int availableWidth = static_cast<int>(item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL);
+                int sizeTextWidth = fmFolderSize.horizontalAdvance(sizeStr);
+                QString elidedFolderName = fmFolder.elidedText(folderName, Qt::ElideRight, availableWidth - sizeTextWidth);
+                int folderNameWidth = fmFolder.horizontalAdvance(elidedFolderName);
+                int totalTextWidth = folderNameWidth + sizeTextWidth;
+                double startX = item.rect.left() + SIDE_MARGIN_FOLDER_LABEL +
+                                (item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL - totalTextWidth) / 2.0;
+                int baseline = item.rect.top() + TOP_MARGIN_FOLDER_LABEL + fmFolder.ascent();
 
-            // Draw folder name.
-            painter.setFont(folderFont);
-            painter.drawText(QPointF(startX, baseline), elidedFolderName);
-            // Draw the size in the smaller font.
-            painter.setFont(folderSizeFont);
-            painter.drawText(QPointF(startX + folderNameWidth, baseline), sizeStr);
-
-            // Draw the child folder area below.
+                // Draw folder name.
+                painter.setFont(folderFont);
+                painter.drawText(QPointF(startX, baseline), elidedFolderName);
+                // Draw the size in the smaller font.
+                painter.setFont(folderSizeFont);
+                painter.drawText(QPointF(startX + folderNameWidth, baseline), sizeStr);
+            }
+            // Compute child area. If text wasn't drawn, the child area shifts up.
+            int textHeight = canDrawText ? fmFolder.height() : 0;
             QRectF childRect(item.rect.left() + SIDE_MARGIN_FOLDER_LABEL + EXTRA_SIDE_BUFFER,
-                             item.rect.top() + TOP_MARGIN_FOLDER_LABEL + fmFolder.height(),
+                             item.rect.top() + TOP_MARGIN_FOLDER_LABEL + textHeight,
                              item.rect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL - 2 * EXTRA_SIDE_BUFFER,
-                             item.rect.height() - TOP_MARGIN_FOLDER_LABEL - fmFolder.height() - BOTTOM_MARGIN_FOLDER_LABEL);
+                             item.rect.height() - TOP_MARGIN_FOLDER_LABEL - textHeight - BOTTOM_MARGIN_FOLDER_LABEL);
             if (childRect.width() > 50 && childRect.height() > 30) {
                 renderFolderMap(painter, item.folder, childRect, depth + 1);
             }
         } else {
-            // For files: name on the first line and size underneath.
+            // For files: display name on the first line and size underneath.
             painter.setFont(fileFont);
             QFontMetrics fmFile(painter.font());
-            QString filename = QFileInfo(item.path).fileName();
-            QString elidedName = fmFile.elidedText(filename, Qt::ElideRight, static_cast<int>(innerRect.width()));
-            QString sizeStr = formatFileSize(item.size);
-            QRectF nameRect(innerRect.left(), innerRect.top(), innerRect.width(), fmFile.height());
-            QRectF sizeRect(innerRect.left(), innerRect.top() + fmFile.height(), innerRect.width(), fmFile.height());
-            painter.drawText(nameRect, Qt::AlignCenter, elidedName);
-            painter.drawText(sizeRect, Qt::AlignCenter, sizeStr);
+            // Check if there is enough space to print the filename and size.
+            bool canDrawText = (innerRect.width() >= MIN_LABEL_WIDTH && innerRect.height() >= (fmFile.height() * 2));
+            if (canDrawText) {
+                QString filename = QFileInfo(item.path).fileName();
+                QString elidedName = fmFile.elidedText(filename, Qt::ElideRight, static_cast<int>(innerRect.width()));
+                QString sizeStr = formatFileSize(item.size);
+                QRectF nameRect(innerRect.left(), innerRect.top(), innerRect.width(), fmFile.height());
+                QRectF sizeRect(innerRect.left(), innerRect.top() + fmFile.height(), innerRect.width(), fmFile.height());
+                painter.drawText(nameRect, Qt::AlignCenter, elidedName);
+                painter.drawText(sizeRect, Qt::AlignCenter, sizeStr);
+            }
         }
     }
     painter.setFont(originalFont);
 }
+
 
 
 void FolderMapWidget::zoomOut()
