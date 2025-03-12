@@ -29,55 +29,60 @@ static const double ROLLUP_THRESHOLD = 3.0;
 //static const QColor COLOR_ROLLUP = Qt::darkGray;
 static const QColor COLOR_ROLLUP = QColor(180, 180, 180);  // Softer gray
 
-// Extended File Type Coloring with Softer Pastel Tones
+#include <QColor>
+#include <QFileInfo>
+#include <QString>
+#include <vector>
+
+// Function to adjust color based on index
+static QColor adjustColor(QColor baseColor, int index, int variation = 10) {
+    int r = qBound(0, baseColor.red() + index * variation, 255);
+    int g = qBound(0, baseColor.green() + index * variation, 255);
+    int b = qBound(0, baseColor.blue() + index * variation, 255);
+    return QColor(r, g, b);
+}
+
+// Extended File Type Coloring with Systematic Variance
 static QColor getFileTypeColor(const QString &filePath) {
     QString ext = QFileInfo(filePath).suffix().toLower();
-    if(ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
-       ext == "bmp" || ext == "tiff" || ext == "ico")
-        return QColor(255, 218, 185); // Softer Peach
-    else if(ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
-            ext == "wmv" || ext == "flv" || ext == "webm")
-        return QColor(255, 250, 205); // Lighter Yellow
-    else if(ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
-            ext == "flac" || ext == "m4a")
-        return QColor(218, 112, 214); // Soft Lavender
-    else if(ext == "txt" || ext == "md" || ext == "log" || ext == "csv" ||
-            ext == "rtf")
-        return QColor(216, 191, 216); // Muted Lavender
-    else if(ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" ||
-            ext == "ppt" || ext == "pptx")
-        return QColor(152, 251, 152); // Softer Green
-    else if(ext == "pdf")
-        return QColor(240, 230, 140); // Lighter Gold
-    else if(ext == "zip" || ext == "7z" || ext == "rar" || ext == "tar" ||
-            ext == "gz" || ext == "bz2" || ext == "xz" || ext == "iso")
-        return QColor(255, 239, 184); // Soft Beige
-    else if(ext == "cs" || ext == "cpp" || ext == "c" || ext == "java" ||
-            ext == "py" || ext == "js" || ext == "html" || ext == "css" ||
-            ext == "php" || ext == "rb" || ext == "go")
-        return QColor(176, 196, 222); // Pastel Blue
-    else if(ext == "dll" || ext == "bin" || ext == "dat" || ext == "sys")
-        return QColor(176, 224, 230); // Muted Cyan
-    else if(ext == "exe" || ext == "cmd" || ext == "com" || ext == "bat" ||
-            ext == "scr")
-        return QColor(205, 92, 92); // Soft Red
-    else if(ext == "db" || ext == "sql" || ext == "mdb" || ext == "accdb" ||
-            ext == "sqlite")
-        return QColor(143, 188, 143); // Soft Sage
-    else if(ext == "svg" || ext == "eps" || ext == "ai")
-        return QColor(255, 182, 193); // Muted Pink
-    // Linux-specific file types:
-    else if(ext == "sh")  // Shell scripts
-        return QColor(144, 238, 144); // Pastel Green
-    else if(ext == "conf" || ext == "ini" || ext == "cfg")  // Config files
-        return QColor(222, 184, 135); // Softer Tan
-    else if(ext == "out" || ext == "run" || ext == "appimage")  // Executable binaries
-        return QColor(119, 136, 153); // Muted Blue Gray
-    else if(ext == "log")  // Log files
-        return QColor(255, 160, 122); // Soft Coral
-    else
-        return QColor(173, 216, 230); // Softer Sky Blue
+
+    struct FileTypeGroup {
+        std::vector<QString> extensions;
+        QColor baseColor;
+    };
+
+    // Define file type groups with base colors
+    std::vector<FileTypeGroup> fileGroups = {
+        {{"jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico"}, QColor(255, 218, 185)}, // Softer Peach
+        {{"mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"}, QColor(255, 250, 205)}, // Lighter Yellow
+        {{"mp3", "wav", "aac", "ogg", "flac", "m4a"}, QColor(218, 112, 214)}, // Soft Lavender
+        {{"txt", "md", "log", "csv", "rtf"}, QColor(216, 191, 216)}, // Muted Lavender
+        {{"doc", "docx", "xls", "xlsx", "ppt", "pptx"}, QColor(152, 251, 152)}, // Softer Green
+        {{"pdf"}, QColor(240, 230, 140)}, // Lighter Gold
+        {{"zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso"}, QColor(255, 239, 184)}, // Soft Beige
+        {{"cs", "cpp", "c", "java", "py", "js", "html", "css", "php", "rb", "go"}, QColor(176, 196, 222)}, // Pastel Blue
+        {{"dll", "bin", "dat", "sys"}, QColor(176, 224, 230)}, // Muted Cyan
+        {{"exe", "cmd", "com", "bat", "scr"}, QColor(205, 92, 92)}, // Soft Red
+        {{"db", "sql", "mdb", "accdb", "sqlite"}, QColor(143, 188, 143)}, // Soft Sage
+        {{"svg", "eps", "ai"}, QColor(255, 182, 193)}, // Muted Pink
+        {{"sh"}, QColor(144, 238, 144)}, // Pastel Green
+        {{"conf", "ini", "cfg"}, QColor(222, 184, 135)}, // Softer Tan
+        {{"out", "run", "appimage"}, QColor(119, 136, 153)}, // Muted Blue Gray
+        {{"log"}, QColor(255, 160, 122)}, // Soft Coral
+    };
+
+    // Search for the extension in the file groups
+    for (const auto &group : fileGroups) {
+        auto it = std::find(group.extensions.begin(), group.extensions.end(), ext);
+        if (it != group.extensions.end()) {
+            int index = std::distance(group.extensions.begin(), it);
+            return adjustColor(group.baseColor, index);
+        }
+    }
+
+    return QColor(173, 216, 230); // Default: Softer Sky Blue
 }
+
 
 static QColor getFolderDepthColor(int depth) {
     double maxDepth = 10.0;
