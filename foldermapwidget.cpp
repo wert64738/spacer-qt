@@ -15,8 +15,8 @@
 #include <cmath>
 
 // Adjustable Parameters
-static const int CORNER_ROUNDNESS = 4;
-static const double GAP_BETWEEN_ITEMS = 2.0;
+static const int CORNER_ROUNDNESS = 3;
+static const double GAP_BETWEEN_ITEMS = 1.0;
 static const int EXTRA_SIDE_BUFFER = 2;
 static const int TOP_MARGIN_FOLDER_LABEL = 4;
 static const int SIDE_MARGIN_FOLDER_LABEL = 2;
