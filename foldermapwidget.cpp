@@ -11,8 +11,62 @@
 #include <algorithm>
 #include <QRectF>
 #include <cmath>
-#include <QSet>
-#include "foldermapwidget.h"
+
+// ---------------------------------------------------------------------------
+// Color helpers
+// ---------------------------------------------------------------------------
+
+// Returns a color for a file based on its extension.
+static QColor getFileTypeColor(const QString &filePath) {
+    QString ext = QFileInfo(filePath).suffix().toLower();
+    if(ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
+       ext == "bmp" || ext == "tiff" || ext == "ico")
+        return QColor("PeachPuff");
+    else if(ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
+            ext == "wmv" || ext == "flv" || ext == "webm")
+        return QColor("LemonChiffon");
+    else if(ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
+            ext == "flac" || ext == "m4a")
+        return QColor("MediumOrchid");
+    else if(ext == "txt" || ext == "md" || ext == "log" || ext == "csv" ||
+            ext == "rtf")
+        return QColor("Thistle");
+    else if(ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" ||
+            ext == "ppt" || ext == "pptx")
+        return QColor("PaleGreen");
+    else if(ext == "pdf")
+        return QColor("Khaki");
+    else if(ext == "zip" || ext == "7z" || ext == "rar" || ext == "tar" ||
+            ext == "gz" || ext == "bz2" || ext == "xz" || ext == "iso")
+        return QColor("Gold");
+    else if(ext == "cs" || ext == "cpp" || ext == "c" || ext == "java" ||
+            ext == "py" || ext == "js" || ext == "html" || ext == "css" ||
+            ext == "php" || ext == "rb" || ext == "go")
+        return QColor("LightSlateGray");
+    else if(ext == "dll" || ext == "bin" || ext == "dat" || ext == "sys")
+        return QColor("PowderBlue");
+    else if(ext == "exe" || ext == "cmd" || ext == "com" || ext == "bat" ||
+            ext == "scr")
+        return QColor("DarkRed");
+    else if(ext == "db" || ext == "sql" || ext == "mdb" || ext == "accdb" ||
+            ext == "sqlite")
+        return QColor("DarkSeaGreen");
+    else if(ext == "svg" || ext == "eps" || ext == "ai")
+        return QColor("LightPink");
+    else
+        return QColor("LightBlue");
+}
+
+// Returns a color for a folder based on its depth (interpolates between LightGreen and DarkOliveGreen).
+static QColor getFolderDepthColor(int depth) {
+    // LightGreen (144,238,144) and DarkOliveGreen (85,107,47)
+    double maxDepth = 10.0;
+    double factor = std::min(depth / maxDepth, 1.0);
+    int r = static_cast<int>(144 * (1 - factor) + 85 * factor);
+    int g = static_cast<int>(238 * (1 - factor) + 107 * factor);
+    int b = static_cast<int>(144 * (1 - factor) + 47 * factor);
+    return QColor(r, g, b);
+}
 
 // ---------------------------------------------------------------------------
 // Treemap subdivision algorithm (emulating DivideDisplayArea)
@@ -82,24 +136,8 @@ void FolderMapWidget::buildFolderTree(const QString &path)
     update();
 }
 
-
-
-// Helper: Recursively build the folder tree while avoiding loops.
-static std::shared_ptr<FolderNode> buildFolderTreeRecursiveHelper(const QString &path, QSet<QString> &visited)
+std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)
 {
-    QFileInfo info(path);
-    // Get the canonical path; if empty, fallback to absolute path.
-    QString canonicalPath = info.canonicalFilePath();
-    if (canonicalPath.isEmpty())
-        canonicalPath = info.absoluteFilePath();
-    
-    // If we've already visited this directory, skip it.
-    if (visited.contains(canonicalPath)) {
-        qDebug() << "Loop detected, skipping:" << path;
-        return std::make_shared<FolderNode>(); // Return an empty node.
-    }
-    visited.insert(canonicalPath);
-    
     auto node = std::make_shared<FolderNode>();
     node->path = path;
     QDir dir(path);
@@ -107,7 +145,7 @@ static std::shared_ptr<FolderNode> buildFolderTreeRecursiveHelper(const QString 
         qDebug() << "Directory does not exist:" << path;
         return node;
     }
-    
+
     // Process files (only include those >= 100 bytes)
     QFileInfoList fileInfos = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const QFileInfo &fi : fileInfos) {
@@ -116,11 +154,11 @@ static std::shared_ptr<FolderNode> buildFolderTreeRecursiveHelper(const QString 
             node->totalSize += fi.size();
         }
     }
-    
-    // Process subfolders recursively.
+
+    // Process subfolders recursively
     QFileInfoList dirInfos = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const QFileInfo &di : dirInfos) {
-        auto child = buildFolderTreeRecursiveHelper(di.absoluteFilePath(), visited);
+        auto child = buildFolderTreeRecursive(di.absoluteFilePath());
         if (child && child->totalSize > 0) {
             node->subFolders.append(child);
             node->totalSize += child->totalSize;
@@ -131,14 +169,6 @@ static std::shared_ptr<FolderNode> buildFolderTreeRecursiveHelper(const QString 
              << ", total size =" << node->totalSize;
     return node;
 }
-
-// Original function now calls the helper with an empty visited set.
-std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)
-{
-    QSet<QString> visited;
-    return buildFolderTreeRecursiveHelper(path, visited);
-}
-
 
 void FolderMapWidget::paintEvent(QPaintEvent *event)
 {
@@ -181,7 +211,6 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
     divideDisplayArea(items, 0, items.size(), rect, total, gap);
 
     // --- Rollup small items ---
-    // Define a threshold below which an item is considered too small.
     double rollupThreshold = 3.0;
     QList<RenderItem> tinyItems;
     for (int i = items.size() - 1; i >= 0; i--) {
@@ -214,9 +243,9 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         total = 0;
         for (const RenderItem &it : items)
             total += it.size;
-        // Recalculate subdivisions with the new rollup item in place.
         divideDisplayArea(items, 0, items.size(), rect, total, gap);
     }
+
     // Save the rendered items for mouseover lookup.
     for (const auto &item : items)
         m_renderItems.append(item);
@@ -224,28 +253,29 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
     // Save original font.
     QFont originalFont = painter.font();
     // Define explicit fonts:
-    // For files, use a 7-point font.
     QFont fileFont = originalFont;
     fileFont.setPointSize(7);
-    // For folders, use a 9-point font.
     QFont folderFont = originalFont;
     folderFont.setPointSize(9);
 
     // Draw each item.
     for (const auto &item : items) {
-        QColor fillColor = item.isFolder ? ((depth % 2 == 0) ? Qt::lightGray : Qt::gray)
-                                         : (item.isRollup ? Qt::darkGray : Qt::cyan);
+        QColor fillColor;
+        if (item.isRollup)
+            fillColor = Qt::darkGray;
+        else if (item.isFolder)
+            fillColor = getFolderDepthColor(depth);
+        else
+            fillColor = getFileTypeColor(item.path);
         painter.fillRect(item.rect, fillColor);
         painter.drawRect(item.rect);
 
         if (item.isRollup) {
-            // Draw the rollup label in the center.
             painter.setFont(folderFont);
             QFontMetrics fmRollup(painter.font());
-            QString rollupText = item.path; // e.g. "Rollup (3)"
+            QString rollupText = item.path;
             painter.drawText(item.rect, Qt::AlignCenter, rollupText);
         } else if (item.isFolder) {
-            // Draw the folder label using folderFont.
             painter.setFont(folderFont);
             QFontMetrics fmFolder(painter.font());
             QString filename = QFileInfo(item.path).fileName();
@@ -261,12 +291,10 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
                              item.rect.top() + 9 + fmFolder.height(),
                              item.rect.width() - 4,
                              item.rect.height() - 9 - fmFolder.height() - 2);
-            // Recursively render the folder’s contents if space permits.
             if (childRect.width() > 50 && childRect.height() > 30) {
                 renderFolderMap(painter, item.folder, childRect, depth + 1);
             }
         } else {
-            // Draw file items using fileFont.
             painter.setFont(fileFont);
             QFontMetrics fmFile(painter.font());
             QString filename = QFileInfo(item.path).fileName();
@@ -274,7 +302,6 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
             painter.drawText(item.rect, Qt::AlignCenter, elidedText);
         }
     }
-    // Restore the original font.
     painter.setFont(originalFont);
 }
 
@@ -293,7 +320,7 @@ void FolderMapWidget::zoomOut()
 
 void FolderMapWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    // Iterate over rendered items in reverse order to prioritize deeper (more specific) items.
+    // Iterate over rendered items in reverse order to prioritize more specific ones.
     for (int i = m_renderItems.size() - 1; i >= 0; i--) {
         const RenderItem &item = m_renderItems.at(i);
         if (item.rect.contains(event->pos())) {
