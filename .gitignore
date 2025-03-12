@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# mine
+moc_*
+Spacer
