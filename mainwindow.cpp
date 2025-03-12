@@ -5,10 +5,8 @@
 #include <QAction>
 #include <QFileDialog>
 #include <QLineEdit>
-#include <QLabel>
-#include <QStatusBar>
-#include <QHBoxLayout>
 #include <QDebug>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,34 +19,28 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *homeAct = toolbar->addAction("Home");
     rootPathEdit = new QLineEdit(this);
     rootPathEdit->setReadOnly(true);
+    connect(folderWidget, &FolderMapWidget::rootFolderChanged, this, &MainWindow::updateRootPath);
+
     toolbar->addWidget(rootPathEdit);
     QAction *zoomOutAction = toolbar->addAction("Zoom Out");
 
     connect(chooseFolderAction, &QAction::triggered, this, &MainWindow::chooseFolder);
     connect(homeAct, &QAction::triggered, this, &MainWindow::scanHome);
     connect(zoomOutAction, &QAction::triggered, this, &MainWindow::zoomOut);
-
-    processingIndicator = new QLabel("Scanning directories...", this);
-    processingIndicator->setVisible(false);
-    statusBar()->addPermanentWidget(processingIndicator);
 }
 
 void MainWindow::chooseFolder()
 {
     QString folder = QFileDialog::getExistingDirectory(this, "Select Folder", QString());
     if (!folder.isEmpty()) {
-        setProcessing(true);
         folderWidget->buildFolderTree(folder);
         updateRootPath(folder);
-        setProcessing(false);
     }
 }
 
 void MainWindow::zoomOut()
 {
-    setProcessing(true);
     folderWidget->zoomOut();
-    setProcessing(false);
 }
 
 void MainWindow::scanHome()
@@ -59,9 +51,4 @@ void MainWindow::scanHome()
 void MainWindow::updateRootPath(const QString &path)
 {
     rootPathEdit->setText(path);
-}
-
-void MainWindow::setProcessing(bool processing)
-{
-    processingIndicator->setVisible(processing);
 }

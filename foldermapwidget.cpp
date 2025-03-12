@@ -14,22 +14,19 @@
 #include <cmath>
 
 // Adjustable Parameters
-static const int CORNER_ROUNDNESS = 4;              // Corner roundness in pixels.
-static const double GAP_BETWEEN_ITEMS = 2.0;        // Gap between adjacent items (files/folders).
-static const int EXTRA_SIDE_BUFFER = 2;             // Additional side buffer for folder child area.
-static const int TOP_MARGIN_FOLDER_LABEL = 6;       // Top margin for folder label.
-static const int SIDE_MARGIN_FOLDER_LABEL = 2;      // Left/right margin for folder label.
-static const int BOTTOM_MARGIN_FOLDER_LABEL = 2;    // Bottom margin for folder label.
-static const int FILE_FONT_SIZE = 5;                // Fixed font size for files.
-static const int FOLDER_FONT_SIZE = 7;              // Fixed font size for folders.
-static const double ROLLUP_THRESHOLD = 3.0;         // Threshold (in pixels) below which items are rolled up.
+static const int CORNER_ROUNDNESS = 4;
+static const double GAP_BETWEEN_ITEMS = 2.0;
+static const int EXTRA_SIDE_BUFFER = 2;
+static const int TOP_MARGIN_FOLDER_LABEL = 4;
+static const int SIDE_MARGIN_FOLDER_LABEL = 2;
+static const int BOTTOM_MARGIN_FOLDER_LABEL = 2;
+static const int FILE_FONT_SIZE = 5;
+static const int FOLDER_FONT_SIZE = 5;
+static const double ROLLUP_THRESHOLD = 3.0;
 
-// Color settings (you can adjust these as needed)
+// Color settings
 static const QColor COLOR_ROLLUP = Qt::darkGray;
 
-// ---------------------------------------------------------------------------
-// Color helper functions
-// ---------------------------------------------------------------------------
 static QColor getFileTypeColor(const QString &filePath) {
     QString ext = QFileInfo(filePath).suffix().toLower();
     if(ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
@@ -79,9 +76,6 @@ static QColor getFolderDepthColor(int depth) {
     return QColor(r, g, b);
 }
 
-// ---------------------------------------------------------------------------
-// Treemap subdivision algorithm (emulating DivideDisplayArea)
-// ---------------------------------------------------------------------------
 static void divideDisplayArea(QList<RenderItem> &items, int start, int count, const QRectF &area, double totalSize, double gap)
 {
     double safeWidth = std::max(0.0, area.width());
@@ -126,9 +120,6 @@ static void divideDisplayArea(QList<RenderItem> &items, int start, int count, co
     }
 }
 
-// ---------------------------------------------------------------------------
-// FolderMapWidget Implementation
-// ---------------------------------------------------------------------------
 FolderMapWidget::FolderMapWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -139,8 +130,14 @@ FolderMapWidget::FolderMapWidget(QWidget *parent)
 void FolderMapWidget::buildFolderTree(const QString &path)
 {
     rootFolder = buildFolderTreeRecursive(path);
+    QDir d(rootFolder->path);
+    if(d.cdUp())
+        emit rootFolderChanged(d.absolutePath());
+    else
+        emit rootFolderChanged(rootFolder->path);
     update();
 }
+
 
 std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)
 {
@@ -228,7 +225,7 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
             return a.size > b.size;
         });
         total = 0;
-        for (const RenderItem &it : items)
+        for (const auto &it : items)
             total += it.size;
         divideDisplayArea(items, 0, items.size(), rect, total, gap);
     }
@@ -236,8 +233,13 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         m_renderItems.append(item);
 
     QFont originalFont = painter.font();
-    QFont fileFont = originalFont; fileFont.setPointSize(FILE_FONT_SIZE);
-    QFont folderFont = originalFont; folderFont.setPointSize(FOLDER_FONT_SIZE);
+    QFont fileFont = originalFont; 
+    fileFont.setPointSize(FILE_FONT_SIZE);
+    fileFont.setBold(false);
+
+    QFont folderFont = originalFont; 
+    folderFont.setPointSize(FOLDER_FONT_SIZE);
+    folderFont.setBold(true);  // Make folder names bold
 
     // Draw each item with rounded corners and a 1-pixel gap.
     for (const auto &item : items) {
@@ -325,9 +327,14 @@ void FolderMapWidget::mouseDoubleClickEvent(QMouseEvent *event)
         if (item.rect.contains(event->pos())) {
             if (item.isFolder && !item.isRollup && item.folder) {
                 rootFolder = item.folder;
+                QDir d(rootFolder->path);
+                if (d.cdUp())
+                    emit rootFolderChanged(d.absolutePath());
+                else
+                    emit rootFolderChanged(rootFolder->path);
                 update();
                 return;
-            }
+            }            
         }
     }
     QWidget::mouseDoubleClickEvent(event);
