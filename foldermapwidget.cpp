@@ -34,15 +34,20 @@ static const QColor COLOR_ROLLUP = QColor(180, 180, 180);  // Softer gray
 #include <QString>
 #include <vector>
 
+#include <QColor>
+#include <QFileInfo>
+#include <QString>
+#include <vector>
+
 // Function to adjust color based on index
-static QColor adjustColor(QColor baseColor, int index, int variation = 10) {
-    int r = qBound(0, baseColor.red() + index * variation, 255);
-    int g = qBound(0, baseColor.green() + index * variation, 255);
-    int b = qBound(0, baseColor.blue() + index * variation, 255);
+static QColor adjustColor(QColor baseColor, int index, int variation = 20) {
+    int r = qBound(0, baseColor.red() + index * variation - 10, 255);
+    int g = qBound(0, baseColor.green() + index * variation - 10, 255);
+    int b = qBound(0, baseColor.blue() + index * variation - 10, 255);
     return QColor(r, g, b);
 }
 
-// Extended File Type Coloring with Systematic Variance
+// Extended File Type Coloring with Less Pastel Tones
 static QColor getFileTypeColor(const QString &filePath) {
     QString ext = QFileInfo(filePath).suffix().toLower();
 
@@ -51,24 +56,24 @@ static QColor getFileTypeColor(const QString &filePath) {
         QColor baseColor;
     };
 
-    // Define file type groups with base colors
+    // Define file type groups with slightly richer colors
     std::vector<FileTypeGroup> fileGroups = {
-        {{"jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico"}, QColor(255, 218, 185)}, // Softer Peach
-        {{"mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"}, QColor(255, 250, 205)}, // Lighter Yellow
-        {{"mp3", "wav", "aac", "ogg", "flac", "m4a"}, QColor(218, 112, 214)}, // Soft Lavender
-        {{"txt", "md", "log", "csv", "rtf"}, QColor(216, 191, 216)}, // Muted Lavender
-        {{"doc", "docx", "xls", "xlsx", "ppt", "pptx"}, QColor(152, 251, 152)}, // Softer Green
-        {{"pdf"}, QColor(240, 230, 140)}, // Lighter Gold
-        {{"zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso"}, QColor(255, 239, 184)}, // Soft Beige
-        {{"cs", "cpp", "c", "java", "py", "js", "html", "css", "php", "rb", "go"}, QColor(176, 196, 222)}, // Pastel Blue
-        {{"dll", "bin", "dat", "sys"}, QColor(176, 224, 230)}, // Muted Cyan
-        {{"exe", "cmd", "com", "bat", "scr"}, QColor(205, 92, 92)}, // Soft Red
-        {{"db", "sql", "mdb", "accdb", "sqlite"}, QColor(143, 188, 143)}, // Soft Sage
-        {{"svg", "eps", "ai"}, QColor(255, 182, 193)}, // Muted Pink
-        {{"sh"}, QColor(144, 238, 144)}, // Pastel Green
-        {{"conf", "ini", "cfg"}, QColor(222, 184, 135)}, // Softer Tan
-        {{"out", "run", "appimage"}, QColor(119, 136, 153)}, // Muted Blue Gray
-        {{"log"}, QColor(255, 160, 122)}, // Soft Coral
+        {{"jpg", "jpeg", "png", "gif", "bmp", "tiff", "ico"}, QColor(240, 180, 140)}, // Warmer Peach
+        {{"mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"}, QColor(255, 225, 100)}, // Stronger Yellow
+        {{"mp3", "wav", "aac", "ogg", "flac", "m4a"}, QColor(200, 90, 200)}, // Richer Lavender
+        {{"txt", "md", "log", "csv", "rtf"}, QColor(180, 160, 180)}, // Deeper Lavender
+        {{"doc", "docx", "xls", "xlsx", "ppt", "pptx"}, QColor(100, 230, 100)}, // Deeper Green
+        {{"pdf"}, QColor(230, 200, 80)}, // Stronger Gold
+        {{"zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso"}, QColor(230, 210, 150)}, // Warmer Beige
+        {{"cs", "cpp", "c", "java", "py", "js", "html", "css", "php", "rb", "go"}, QColor(120, 170, 220)}, // Richer Blue
+        {{"dll", "bin", "dat", "sys"}, QColor(120, 200, 220)}, // Stronger Cyan
+        {{"exe", "cmd", "com", "bat", "scr"}, QColor(190, 60, 60)}, // Stronger Red
+        {{"db", "sql", "mdb", "accdb", "sqlite"}, QColor(100, 150, 100)}, // Deeper Sage
+        {{"svg", "eps", "ai"}, QColor(250, 120, 140)}, // Stronger Pink
+        {{"sh"}, QColor(80, 200, 80)}, // Vibrant Green
+        {{"conf", "ini", "cfg"}, QColor(190, 140, 80)}, // Deeper Tan
+        {{"out", "run", "appimage"}, QColor(90, 110, 140)}, // Deeper Blue Gray
+        {{"log"}, QColor(220, 110, 90)}, // Stronger Coral
     };
 
     // Search for the extension in the file groups
@@ -80,8 +85,9 @@ static QColor getFileTypeColor(const QString &filePath) {
         }
     }
 
-    return QColor(173, 216, 230); // Default: Softer Sky Blue
+    return QColor(100, 170, 220); // Default: Richer Sky Blue
 }
+
 
 
 static QColor getFolderDepthColor(int depth) {
