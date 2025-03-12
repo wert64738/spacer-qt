@@ -12,12 +12,14 @@
 #include <algorithm>
 #include <QRectF>
 #include <cmath>
+#include <QDesktopServices> 
+#include <QUrl>
 
 // Adjustable Parameters
 static const int CORNER_ROUNDNESS = 4;
 static const double GAP_BETWEEN_ITEMS = 2.0;
 static const int EXTRA_SIDE_BUFFER = 2;
-static const int TOP_MARGIN_FOLDER_LABEL = 4;
+static const int TOP_MARGIN_FOLDER_LABEL = 5;
 static const int SIDE_MARGIN_FOLDER_LABEL = 2;
 static const int BOTTOM_MARGIN_FOLDER_LABEL = 2;
 static const int FILE_FONT_SIZE = 5;
@@ -29,40 +31,52 @@ static const QColor COLOR_ROLLUP = Qt::darkGray;
 
 static QColor getFileTypeColor(const QString &filePath) {
     QString ext = QFileInfo(filePath).suffix().toLower();
-    if(ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
-       ext == "bmp" || ext == "tiff" || ext == "ico")
+
+    if (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
+        ext == "bmp" || ext == "tiff" || ext == "ico")
         return QColor("PeachPuff");
-    else if(ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
-            ext == "wmv" || ext == "flv" || ext == "webm")
+    else if (ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
+             ext == "wmv" || ext == "flv" || ext == "webm")
         return QColor("LemonChiffon");
-    else if(ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
-            ext == "flac" || ext == "m4a")
+    else if (ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
+             ext == "flac" || ext == "m4a")
         return QColor("MediumOrchid");
-    else if(ext == "txt" || ext == "md" || ext == "log" || ext == "csv" ||
-            ext == "rtf")
+    else if (ext == "txt" || ext == "md" || ext == "log" || ext == "csv" ||
+             ext == "rtf")
         return QColor("Thistle");
-    else if(ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" ||
-            ext == "ppt" || ext == "pptx")
+    else if (ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" ||
+             ext == "ppt" || ext == "pptx")
         return QColor("PaleGreen");
-    else if(ext == "pdf")
+    else if (ext == "pdf")
         return QColor("Khaki");
-    else if(ext == "zip" || ext == "7z" || ext == "rar" || ext == "tar" ||
-            ext == "gz" || ext == "bz2" || ext == "xz" || ext == "iso")
+    else if (ext == "zip" || ext == "7z" || ext == "rar" || ext == "tar" ||
+             ext == "gz" || ext == "bz2" || ext == "xz" || ext == "iso")
         return QColor("Gold");
-    else if(ext == "cs" || ext == "cpp" || ext == "c" || ext == "java" ||
-            ext == "py" || ext == "js" || ext == "html" || ext == "css" ||
-            ext == "php" || ext == "rb" || ext == "go")
+    else if (ext == "cs" || ext == "cpp" || ext == "c" || ext == "java" ||
+             ext == "py" || ext == "js" || ext == "html" || ext == "css" ||
+             ext == "php" || ext == "rb" || ext == "go")
         return QColor("LightSlateGray");
-    else if(ext == "dll" || ext == "bin" || ext == "dat" || ext == "sys")
+    else if (ext == "dll" || ext == "bin" || ext == "dat" || ext == "sys")
         return QColor("PowderBlue");
-    else if(ext == "exe" || ext == "cmd" || ext == "com" || ext == "bat" ||
-            ext == "scr")
+    else if (ext == "exe" || ext == "cmd" || ext == "com" || ext == "bat" ||
+             ext == "scr")
         return QColor("DarkRed");
-    else if(ext == "db" || ext == "sql" || ext == "mdb" || ext == "accdb" ||
-            ext == "sqlite")
+    else if (ext == "db" || ext == "sql" || ext == "mdb" || ext == "accdb" ||
+             ext == "sqlite")
         return QColor("DarkSeaGreen");
-    else if(ext == "svg" || ext == "eps" || ext == "ai")
+    else if (ext == "svg" || ext == "eps" || ext == "ai")
         return QColor("LightPink");
+
+    // Linux-specific file types
+    else if (ext == "sh")  // Shell scripts
+        return QColor("LightGreen");
+    else if (ext == "conf" || ext == "ini" || ext == "cfg")  // Config files
+        return QColor("BurlyWood");
+    else if (ext == "out" || ext == "run" || ext == "appimage")  // Executable binaries
+        return QColor("DarkSlateGray");
+    else if (ext == "log")  // Log files
+        return QColor("OrangeRed");
+
     else
         return QColor("LightBlue");
 }
@@ -293,14 +307,18 @@ void FolderMapWidget::zoomOut()
 {
     if (!rootFolder)
         return;
+
     QDir dir(rootFolder->path);
-    if (dir.cdUp()) {
+
+    // Prevent zooming out beyond the first level (i.e., avoid '/')
+    if (dir.cdUp() && dir.absolutePath() != "/") {
         qDebug() << "Zooming out from" << rootFolder->path << "to" << dir.absolutePath();
         buildFolderTree(dir.absolutePath());
     } else {
         qDebug() << "Cannot zoom out further from" << rootFolder->path;
     }
 }
+
 
 void FolderMapWidget::mouseMoveEvent(QMouseEvent *event)
 {
@@ -334,7 +352,19 @@ void FolderMapWidget::mouseDoubleClickEvent(QMouseEvent *event)
                     emit rootFolderChanged(rootFolder->path);
                 update();
                 return;
-            }            
+            }
+            else if (!item.isFolder) { // Open media files in default viewer
+                QString ext = QFileInfo(item.path).suffix().toLower();
+                if (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
+                    ext == "bmp" || ext == "tiff" || ext == "ico" ||
+                    ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
+                    ext == "wmv" || ext == "flv" || ext == "webm" ||
+                    ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
+                    ext == "flac" || ext == "m4a") {
+                    QDesktopServices::openUrl(QUrl::fromLocalFile(item.path));
+                    return;
+                }
+            }
         }
     }
     QWidget::mouseDoubleClickEvent(event);
