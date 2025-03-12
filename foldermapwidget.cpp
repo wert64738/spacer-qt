@@ -10,16 +10,15 @@
 #include <QFontMetrics>
 #include <QDebug>
 #include <algorithm>
-#include <QRectF>
-#include <cmath>
-#include <QDesktopServices> 
+#include <QDesktopServices>
 #include <QUrl>
+#include <cmath>
 
 // Adjustable Parameters
 static const int CORNER_ROUNDNESS = 4;
 static const double GAP_BETWEEN_ITEMS = 2.0;
 static const int EXTRA_SIDE_BUFFER = 2;
-static const int TOP_MARGIN_FOLDER_LABEL = 5;
+static const int TOP_MARGIN_FOLDER_LABEL = 4;
 static const int SIDE_MARGIN_FOLDER_LABEL = 2;
 static const int BOTTOM_MARGIN_FOLDER_LABEL = 2;
 static const int FILE_FONT_SIZE = 5;
@@ -29,54 +28,52 @@ static const double ROLLUP_THRESHOLD = 3.0;
 // Color settings
 static const QColor COLOR_ROLLUP = Qt::darkGray;
 
+// Extended File Type Coloring for Linux-Specific Files
 static QColor getFileTypeColor(const QString &filePath) {
     QString ext = QFileInfo(filePath).suffix().toLower();
-
-    if (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
-        ext == "bmp" || ext == "tiff" || ext == "ico")
+    if(ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
+       ext == "bmp" || ext == "tiff" || ext == "ico")
         return QColor("PeachPuff");
-    else if (ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
-             ext == "wmv" || ext == "flv" || ext == "webm")
+    else if(ext == "mp4" || ext == "avi" || ext == "mkv" || ext == "mov" ||
+            ext == "wmv" || ext == "flv" || ext == "webm")
         return QColor("LemonChiffon");
-    else if (ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
-             ext == "flac" || ext == "m4a")
+    else if(ext == "mp3" || ext == "wav" || ext == "aac" || ext == "ogg" ||
+            ext == "flac" || ext == "m4a")
         return QColor("MediumOrchid");
-    else if (ext == "txt" || ext == "md" || ext == "log" || ext == "csv" ||
-             ext == "rtf")
+    else if(ext == "txt" || ext == "md" || ext == "log" || ext == "csv" ||
+            ext == "rtf")
         return QColor("Thistle");
-    else if (ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" ||
-             ext == "ppt" || ext == "pptx")
+    else if(ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" ||
+            ext == "ppt" || ext == "pptx")
         return QColor("PaleGreen");
-    else if (ext == "pdf")
+    else if(ext == "pdf")
         return QColor("Khaki");
-    else if (ext == "zip" || ext == "7z" || ext == "rar" || ext == "tar" ||
-             ext == "gz" || ext == "bz2" || ext == "xz" || ext == "iso")
+    else if(ext == "zip" || ext == "7z" || ext == "rar" || ext == "tar" ||
+            ext == "gz" || ext == "bz2" || ext == "xz" || ext == "iso")
         return QColor("Gold");
-    else if (ext == "cs" || ext == "cpp" || ext == "c" || ext == "java" ||
-             ext == "py" || ext == "js" || ext == "html" || ext == "css" ||
-             ext == "php" || ext == "rb" || ext == "go")
+    else if(ext == "cs" || ext == "cpp" || ext == "c" || ext == "java" ||
+            ext == "py" || ext == "js" || ext == "html" || ext == "css" ||
+            ext == "php" || ext == "rb" || ext == "go")
         return QColor("LightSlateGray");
-    else if (ext == "dll" || ext == "bin" || ext == "dat" || ext == "sys")
+    else if(ext == "dll" || ext == "bin" || ext == "dat" || ext == "sys")
         return QColor("PowderBlue");
-    else if (ext == "exe" || ext == "cmd" || ext == "com" || ext == "bat" ||
-             ext == "scr")
+    else if(ext == "exe" || ext == "cmd" || ext == "com" || ext == "bat" ||
+            ext == "scr")
         return QColor("DarkRed");
-    else if (ext == "db" || ext == "sql" || ext == "mdb" || ext == "accdb" ||
-             ext == "sqlite")
+    else if(ext == "db" || ext == "sql" || ext == "mdb" || ext == "accdb" ||
+            ext == "sqlite")
         return QColor("DarkSeaGreen");
-    else if (ext == "svg" || ext == "eps" || ext == "ai")
+    else if(ext == "svg" || ext == "eps" || ext == "ai")
         return QColor("LightPink");
-
-    // Linux-specific file types
-    else if (ext == "sh")  // Shell scripts
+    // Linux-specific file types:
+    else if(ext == "sh")  // Shell scripts
         return QColor("LightGreen");
-    else if (ext == "conf" || ext == "ini" || ext == "cfg")  // Config files
+    else if(ext == "conf" || ext == "ini" || ext == "cfg")  // Config files
         return QColor("BurlyWood");
-    else if (ext == "out" || ext == "run" || ext == "appimage")  // Executable binaries
+    else if(ext == "out" || ext == "run" || ext == "appimage")  // Executable binaries
         return QColor("DarkSlateGray");
-    else if (ext == "log")  // Log files
+    else if(ext == "log")  // Log files
         return QColor("OrangeRed");
-
     else
         return QColor("LightBlue");
 }
@@ -144,14 +141,10 @@ FolderMapWidget::FolderMapWidget(QWidget *parent)
 void FolderMapWidget::buildFolderTree(const QString &path)
 {
     rootFolder = buildFolderTreeRecursive(path);
-    QDir d(rootFolder->path);
-    if(d.cdUp())
-        emit rootFolderChanged(d.absolutePath());
-    else
+    if (rootFolder)
         emit rootFolderChanged(rootFolder->path);
     update();
 }
-
 
 std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)
 {
@@ -186,8 +179,44 @@ void FolderMapWidget::paintEvent(QPaintEvent *event)
     m_renderItems.clear();
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    if (rootFolder)
-        renderFolderMap(painter, rootFolder, rect());
+
+    if (!rootFolder)
+        return;
+
+    // Define the outermost folder rectangle with margins
+    QRectF outerRect = rect().adjusted(1, 1, -1, -1);
+
+    painter.setPen(Qt::black);
+    QPainterPath outerPath;
+    outerPath.addRoundedRect(outerRect, CORNER_ROUNDNESS, CORNER_ROUNDNESS);
+    painter.fillPath(outerPath, painter.brush());
+    painter.drawPath(outerPath);
+
+    // Draw the root folder name label inside the outer rectangle
+    QFont originalFont = painter.font();
+    QFont folderLabelFont = originalFont;
+    folderLabelFont.setBold(true);
+    folderLabelFont.setPointSize(FOLDER_FONT_SIZE + 2);
+    painter.setFont(folderLabelFont);
+
+    QFontMetrics fm(painter.font());
+    QString folderName = QFileInfo(rootFolder->path).fileName();
+    if (folderName.isEmpty())
+        folderName = rootFolder->path;
+    QString elidedText = fm.elidedText(folderName, Qt::ElideRight, static_cast<int>(outerRect.width() - 20));
+
+    QRectF labelRect(outerRect.left() + SIDE_MARGIN_FOLDER_LABEL,
+                     outerRect.top() + TOP_MARGIN_FOLDER_LABEL,
+                     outerRect.width() - 2 * SIDE_MARGIN_FOLDER_LABEL,
+                     fm.height());
+    painter.setPen(Qt::black);
+    painter.drawText(labelRect, Qt::AlignCenter, elidedText);
+
+    // Adjust the inner area (treemap) so it doesn't overlap the label
+    QRectF treeRect = outerRect.adjusted(10, fm.height() + 10, -10, -10);
+
+    // Render the inner folder map starting at depth 1 so inner folders get a different shade
+    renderFolderMap(painter, rootFolder, treeRect, 1);
 }
 
 void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<FolderNode> &node, const QRectF &rect, int depth)
@@ -247,11 +276,11 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         m_renderItems.append(item);
 
     QFont originalFont = painter.font();
-    QFont fileFont = originalFont; 
+    QFont fileFont = originalFont;
     fileFont.setPointSize(FILE_FONT_SIZE);
     fileFont.setBold(false);
 
-    QFont folderFont = originalFont; 
+    QFont folderFont = originalFont;
     folderFont.setPointSize(FOLDER_FONT_SIZE);
     folderFont.setBold(true);  // Make folder names bold
 
@@ -307,10 +336,9 @@ void FolderMapWidget::zoomOut()
 {
     if (!rootFolder)
         return;
-
     QDir dir(rootFolder->path);
 
-    // Prevent zooming out beyond the first level (i.e., avoid '/')
+    // Prevent zooming out to root '/'
     if (dir.cdUp() && dir.absolutePath() != "/") {
         qDebug() << "Zooming out from" << rootFolder->path << "to" << dir.absolutePath();
         buildFolderTree(dir.absolutePath());
@@ -318,7 +346,6 @@ void FolderMapWidget::zoomOut()
         qDebug() << "Cannot zoom out further from" << rootFolder->path;
     }
 }
-
 
 void FolderMapWidget::mouseMoveEvent(QMouseEvent *event)
 {
@@ -352,8 +379,7 @@ void FolderMapWidget::mouseDoubleClickEvent(QMouseEvent *event)
                     emit rootFolderChanged(rootFolder->path);
                 update();
                 return;
-            }
-            else if (!item.isFolder) { // Open media files in default viewer
+            } else if (!item.isFolder) { // Open media files in default viewer
                 QString ext = QFileInfo(item.path).suffix().toLower();
                 if (ext == "jpg" || ext == "jpeg" || ext == "png" || ext == "gif" ||
                     ext == "bmp" || ext == "tiff" || ext == "ico" ||
