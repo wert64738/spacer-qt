@@ -2,7 +2,10 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "foldermapwidget.h"
+#include <QLineEdit>   // Added
+#include <QLabel>      // Added
+
+class FolderMapWidget; // Forward declaration is sufficient here.
 
 class MainWindow : public QMainWindow
 {
@@ -12,11 +15,15 @@ public:
 
 private slots:
     void chooseFolder();
-    void scanHome();
     void zoomOut();
+    void scanHome();
+    void updateRootPath(const QString &path);
+    void setProcessing(bool processing);
 
 private:
     FolderMapWidget *folderWidget;
+    QLineEdit *rootPathEdit;
+    QLabel *processingIndicator;
 };
 
 #endif // MAINWINDOW_H

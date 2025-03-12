@@ -138,9 +138,7 @@ FolderMapWidget::FolderMapWidget(QWidget *parent)
 
 void FolderMapWidget::buildFolderTree(const QString &path)
 {
-    qDebug() << "Building folder tree for path:" << path;
     rootFolder = buildFolderTreeRecursive(path);
-    qDebug() << "Finished building folder tree. Total size:" << rootFolder->totalSize;
     update();
 }
 
@@ -168,9 +166,6 @@ std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QStr
             node->totalSize += child->totalSize;
         }
     }
-    qDebug() << "Scanned" << path << ": files =" << node->files.size()
-             << ", subfolders =" << node->subFolders.size()
-             << ", total size =" << node->totalSize;
     return node;
 }
 
@@ -195,7 +190,6 @@ void FolderMapWidget::renderFolderMap(QPainter &painter, const std::shared_ptr<F
         qDebug() << "No items to render for node:" << node->path;
         return;
     }
-    qDebug() << "Rendering node:" << node->path << "with" << items.size() << "items.";
     std::sort(items.begin(), items.end(), [](const RenderItem &a, const RenderItem &b) {
         return a.size > b.size;
     });

@@ -6,6 +6,8 @@
 #include <QList>
 #include <QRectF>
 #include <memory>
+#include <QMouseEvent>
+#include <QPaintEvent>
 
 // Represents a folder node in the tree.
 struct FolderNode {
@@ -15,14 +17,13 @@ struct FolderNode {
     qint64 totalSize = 0;
 };
 
-// RenderItem holds information needed for drawing an item (file or folder).
+// RenderItem holds information for drawing an item.
 struct RenderItem {
     QString path;
     qint64 size;
     bool isFolder;
     std::shared_ptr<FolderNode> folder; // Valid if isFolder is true.
     QRectF rect;                      // Assigned by the treemap subdivision algorithm.
-    // Rollup fields:
     bool isRollup = false;
     int rollupCount = 0;
     qint64 rollupMaxSize = 0;
@@ -36,6 +37,9 @@ public:
     void buildFolderTree(const QString &path);
     void zoomOut();
 
+signals:
+    void rootFolderChanged(const QString &newRoot);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -46,7 +50,7 @@ private:
     void renderFolderMap(QPainter &painter, const std::shared_ptr<FolderNode> &node, const QRectF &rect, int depth = 0);
 
     std::shared_ptr<FolderNode> rootFolder;
-    QList<RenderItem> m_renderItems; // Stores rendered items for mouseover lookup.
+    QList<RenderItem> m_renderItems;
 };
 
 #endif // FOLDERMAPWIDGET_H

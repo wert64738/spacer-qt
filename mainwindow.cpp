@@ -1,33 +1,54 @@
 #include "mainwindow.h"
+#include "foldermapwidget.h" // Ensure the full definition is included
+
 #include <QToolBar>
 #include <QAction>
 #include <QFileDialog>
-#include <QDir>
+#include <QLineEdit>
+#include <QLabel>
+#include <QStatusBar>
+#include <QHBoxLayout>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    setWindowTitle("Spacer");
-    resize(1000, 600);
-
-    QToolBar *toolbar = addToolBar("Main Toolbar");
-    QAction *chooseFolderAct = toolbar->addAction("Choose Folder");
-    QAction *homeAct = toolbar->addAction("Home");
-    QAction *zoomOutAct = toolbar->addAction("Zoom Out");
-
-    connect(chooseFolderAct, &QAction::triggered, this, &MainWindow::chooseFolder);
-    connect(homeAct, &QAction::triggered, this, &MainWindow::scanHome);
-    connect(zoomOutAct, &QAction::triggered, this, &MainWindow::zoomOut);
-
     folderWidget = new FolderMapWidget(this);
     setCentralWidget(folderWidget);
+
+    QToolBar *toolbar = addToolBar("Main Toolbar");
+    QAction *chooseFolderAction = toolbar->addAction("Choose Folder");
+    QAction *homeAct = toolbar->addAction("Home");
+    rootPathEdit = new QLineEdit(this);
+    rootPathEdit->setReadOnly(true);
+    toolbar->addWidget(rootPathEdit);
+    QAction *zoomOutAction = toolbar->addAction("Zoom Out");
+
+    connect(chooseFolderAction, &QAction::triggered, this, &MainWindow::chooseFolder);
+    connect(homeAct, &QAction::triggered, this, &MainWindow::scanHome);
+    connect(zoomOutAction, &QAction::triggered, this, &MainWindow::zoomOut);
+
+    processingIndicator = new QLabel("Scanning directories...", this);
+    processingIndicator->setVisible(false);
+    statusBar()->addPermanentWidget(processingIndicator);
 }
 
 void MainWindow::chooseFolder()
 {
-    QString dir = QFileDialog::getExistingDirectory(this, "Select a folder", QDir::homePath());
-    if (!dir.isEmpty())
-        folderWidget->buildFolderTree(dir);
+    QString folder = QFileDialog::getExistingDirectory(this, "Select Folder", QString());
+    if (!folder.isEmpty()) {
+        setProcessing(true);
+        folderWidget->buildFolderTree(folder);
+        updateRootPath(folder);
+        setProcessing(false);
+    }
+}
+
+void MainWindow::zoomOut()
+{
+    setProcessing(true);
+    folderWidget->zoomOut();
+    setProcessing(false);
 }
 
 void MainWindow::scanHome()
@@ -35,7 +56,12 @@ void MainWindow::scanHome()
     folderWidget->buildFolderTree(QDir::homePath());
 }
 
-void MainWindow::zoomOut()
+void MainWindow::updateRootPath(const QString &path)
 {
-    folderWidget->zoomOut();
+    rootPathEdit->setText(path);
+}
+
+void MainWindow::setProcessing(bool processing)
+{
+    processingIndicator->setVisible(processing);
 }
