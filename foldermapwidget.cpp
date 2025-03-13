@@ -13,6 +13,8 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <cmath>
+#include <QApplication>
+#include <QCursor>
 
 // Adjustable Parameters
 static const int CORNER_ROUNDNESS = 3;
@@ -88,8 +90,6 @@ static QColor getFileTypeColor(const QString &filePath) {
     return QColor(100, 170, 220); // Default: Richer Sky Blue
 }
 
-
-
 static QColor getFolderDepthColor(int depth) {
     double maxDepth = 10.0;
     double factor = std::min(depth / maxDepth, 1.0);
@@ -97,6 +97,14 @@ static QColor getFolderDepthColor(int depth) {
     int g = static_cast<int>(238 * (1 - factor) + 170 * factor);
     int b = static_cast<int>(200 * (1 - factor) + 120 * factor);
     return QColor(r, g, b);
+}
+
+void setBusyCursor() {
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+}
+
+void restoreCursor() {
+    QApplication::restoreOverrideCursor();
 }
 
 static void divideDisplayArea(QList<RenderItem> &items, int start, int count, const QRectF &area, double totalSize, double gap)
@@ -150,12 +158,22 @@ FolderMapWidget::FolderMapWidget(QWidget *parent)
     setMouseTracking(true);
 }
 
+#include <QtConcurrent/QtConcurrent>
+
 void FolderMapWidget::buildFolderTree(const QString &path)
 {
-    rootFolder = buildFolderTreeRecursive(path);
-    if (rootFolder)
-        emit rootFolderChanged(rootFolder->path);
-    update();
+    QApplication::setOverrideCursor(Qt::WaitCursor); // Set busy cursor
+
+    QtConcurrent::run([this, path]() {
+        rootFolder = buildFolderTreeRecursive(path);
+
+        QMetaObject::invokeMethod(this, [this]() {
+            if (rootFolder)
+                emit rootFolderChanged(rootFolder->path);
+            update();
+            QApplication::restoreOverrideCursor(); // Restore cursor on UI thread
+        }, Qt::QueuedConnection);
+    });
 }
 
 std::shared_ptr<FolderNode> FolderMapWidget::buildFolderTreeRecursive(const QString &path)

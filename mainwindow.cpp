@@ -27,6 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(chooseFolderAction, &QAction::triggered, this, &MainWindow::chooseFolder);
     connect(homeAct, &QAction::triggered, this, &MainWindow::scanHome);
     connect(zoomOutAction, &QAction::triggered, this, &MainWindow::zoomOut);
+
+    folderWidget->buildFolderTree(QDir::homePath());
 }
 
 void MainWindow::chooseFolder()
